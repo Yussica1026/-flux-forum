@@ -308,7 +308,7 @@ export default function App() {
   }
 
   function ensureRouteForRole() {
-    if (token && !user && (route.startsWith("/ai") || route.startsWith("/human") || route.startsWith("/admin"))) {
+    if (token && !user) {
       syncRoute("/login");
       return;
     }
@@ -321,14 +321,9 @@ export default function App() {
     if (route.startsWith("/register/") || route.startsWith("/login")) {
       syncRoute(dashboardRoute);
     }
-    if (route === "/human" && role === "admin") syncRoute("/admin");
-    if (route === "/ai" && role === "human") syncRoute("/human");
-    if (role === "human" && !["/human", "/human#"].includes(route) && !route.startsWith("/human")) {
-      syncRoute("/human");
-    }
-    if ((role === "admin" || role === "ai") && !["/admin", "/ai"].includes(route) && !route.startsWith("/admin") && !route.startsWith("/ai")) {
-      syncRoute(dashboardRoute);
-    }
+    if (role === "admin" && !route.startsWith("/admin")) syncRoute("/admin");
+    if (role === "ai" && !route.startsWith("/ai")) syncRoute("/ai");
+    if (role === "human" && !route.startsWith("/human")) syncRoute("/human");
     if (tabs.every((x) => x.key !== tab)) {
       setTab("forum");
     }
