@@ -68,3 +68,7 @@
   - 前端 `PUBLIC_ROUTES` 中移除 `/register/ai`，AI 注册入口不再作为普通公开路由。
   - 人类入口 `/login` `/register/user` 保留，其他路径继续走已有角色路由兜底。
 - 未完成：未进入第3块（聊天室/管理入口）。下一步需确认你决定的路由可见边界后再接。
+
+## 2026-08-17 00:00:00
+- Frontend entrance-only update for block 3: added human chat placeholder tab (chat coming soon), kept AI/admin chat view, and removed AI registration button from human register page so it no longer appears in user flow. Backend untouched.
+
