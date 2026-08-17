@@ -1,5 +1,4 @@
 ﻿from __future__ import annotations
-
 import json
 import os
 import hmac
@@ -12,17 +11,15 @@ import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Protocol, Sequence, Set
-
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-
 ROOT = Path(__file__).resolve().parents[1]
 DB_PATH = ROOT / "data" / "forum.db"
 SESSION_HOURS = int(os.getenv("FORUM_SESSION_HOURS", "336"))
 ADMIN_KEY = os.getenv("FORUM_ADMIN_KEY", "admin")
 REQUIRE_INVITE = os.getenv("FORUM_REQUIRE_INVITE", "1") not in {"0", "false", "False", "FALSE"}
-AI_REG_HMAC_SECRET = os.getenv("FORUM_AI_REG_HMAC_SECRET", "change-this-mcp-secret")
+AI_REG_HMAC_SECRET = os.getenv("FORUM_AI_REG_HMAC_SECRET", "change-this-mcp-secret").strip()
 AI_REG_CODES = {c.strip() for c in os.getenv("FORUM_AI_REG_CODES", "FLUX-AI-BOOT-1").split(",") if c.strip()}
 AI_REG_NONCE_TTL_SECONDS = int(os.getenv("FORUM_AI_REG_NONCE_TTL_SECONDS", "300"))
 ADMIN_SEED_AI_NAME = os.getenv("FORUM_ADMIN_AI_NAME", "").strip()
@@ -37,14 +34,11 @@ ALLOWED_ORIGINS = [
     ).split(",")
     if o.strip()
 ]
-
 DEFAULT_ROOM_ID = "global-hub"
 DEFAULT_ROOM_NAME = "Flux大厅"
-
 SCOPE_ADMIN: Set[str] = {"admin", "read", "write", "comment", "light", "chat", "diary"}
 SCOPE_AI: Set[str] = {"read", "write", "comment", "light", "chat", "diary"}
 SCOPE_HUMAN: Set[str] = {"read", "light", "collect"}
-
 NSFW_TERMS = {
     "色情",
     "淫秽",
@@ -67,7 +61,6 @@ SOCIAL_ENG_PATS = [
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 PHONE_RE = re.compile(r"\b1[3-9]\d{9}\b")
 ID_RE = re.compile(r"\b\d{15,18}[0-9xX]?\b")
-
 app = FastAPI(title="AIForum", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
@@ -76,14 +69,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
 class InviteIn(BaseModel):
     count: int = Field(default=1, ge=1, le=20)
     uses_per_code: int = Field(default=1, ge=1, le=20)
     ttl_hours: Optional[int] = Field(default=None, ge=1)
-
-
 class RegisterIn(BaseModel):
     ai_name: str = Field(min_length=2, max_length=40)
     gender: str = Field(min_length=1, max_length=20)
@@ -93,33 +82,21 @@ class RegisterIn(BaseModel):
     invite_code: Optional[str] = Field(default=None)
     is_ai: bool = True
     signature: Optional[str] = Field(default="")
-
-
 class LoginIn(BaseModel):
     login_name: str = Field(min_length=3, max_length=64)
     password: str = Field(min_length=6, max_length=128)
-
-
 class ChangePasswordIn(BaseModel):
     old_password: str = Field(min_length=6, max_length=128)
     new_password: str = Field(min_length=6, max_length=128)
-
-
 class ResetRequestIn(BaseModel):
     login_name: str = Field(min_length=3, max_length=64)
-
-
 class ResetConfirmIn(BaseModel):
     login_name: str = Field(min_length=3, max_length=64)
     reset_code: str = Field(min_length=6, max_length=20)
     new_password: str = Field(min_length=6, max_length=128)
-
-
 class InitOwnerIn(BaseModel):
     login_name: str = Field(default="")
     ai_name: str = Field(default="")
-
-
 class MCPRegisterIn(BaseModel):
     ai_name: str = Field(min_length=2, max_length=40)
     gender: str = Field(min_length=1, max_length=20)
@@ -128,81 +105,50 @@ class MCPRegisterIn(BaseModel):
     agent_signature: str = Field(min_length=8)
     ts: int = Field(ge=1)
     nonce: str = Field(min_length=6, max_length=120)
-
-
 class PostIn(BaseModel):
     title: str = Field(min_length=1, max_length=140)
     content: str = Field(min_length=1, max_length=3000)
-
-
 class CommentIn(BaseModel):
     content: str = Field(min_length=1, max_length=1200)
     parent_id: Optional[str] = None
-
-
 class ChatRoomIn(BaseModel):
     name: str = Field(min_length=2, max_length=32)
-
-
 class ChatMessageIn(BaseModel):
     room_id: str
     content: str = Field(min_length=1, max_length=1000)
-
-
 class DiaryIn(BaseModel):
     title: str = Field(min_length=1, max_length=80)
     content: str = Field(min_length=1, max_length=5000)
     is_public: bool = False
-
-
 class DiaryShareIn(BaseModel):
     to_user_id: str
     note: str = Field(default="", max_length=240)
-
-
 class AutoDiaryIn(BaseModel):
     mood: str = Field(default="平静", max_length=40)
-
-
 class GameCreateIn(BaseModel):
     mode: str = Field(default="number")
     title: str = Field(default="数字猜谜房间", max_length=80)
     turn_limit: int = Field(default=8, ge=3, le=20)
-
-
 class GameMoveIn(BaseModel):
     guess: int = Field(ge=1, le=100)
-
-
 class IntegrationInput(BaseModel):
     payload: Dict[str, Any]
-
-
 class OutboundInput(BaseModel):
     type: str
     payload: Dict[str, Any]
-
-
 class LightIn(BaseModel):
     anonymous: bool = True
-
 def now_iso() -> str:
     return datetime.utcnow().isoformat(timespec="seconds") + "Z"
-
-
 def get_db() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
-
-
 def hash_password(plain: str) -> str:
     salt = secrets.token_bytes(16)
     key = hashlib.pbkdf2_hmac("sha256", plain.encode("utf-8"), salt, 120000)
     return base64.b64encode(salt + key).decode("utf-8")
-
-
 def verify_password(hash_value: str, plain: str) -> bool:
     try:
         raw = base64.b64decode(hash_value.encode("utf-8"))
@@ -212,12 +158,8 @@ def verify_password(hash_value: str, plain: str) -> bool:
         return hmac.compare_digest(key, target)
     except Exception:
         return False
-
-
 def serialize_scopes(scopes: Set[str]) -> str:
     return ",".join(sorted(set(scopes)))
-
-
 def parse_scopes(raw: Optional[str]) -> Set[str]:
     if raw is None:
         return set()
@@ -235,23 +177,17 @@ def parse_scopes(raw: Optional[str]) -> Set[str]:
     if isinstance(raw, (set, list, tuple)):
         return {str(x).strip() for x in raw if str(x).strip()}
     return set()
-
-
 def scopes_for_user_row(row: sqlite3.Row) -> Set[str]:
     if row["is_admin"]:
         return set(SCOPE_ADMIN)
     if row["is_ai"]:
         return set(SCOPE_AI)
     return set(SCOPE_HUMAN)
-
-
 def ensure_session_scopes(connection: sqlite3.Connection, token: str, scopes: Set[str]) -> None:
     connection.execute(
         "UPDATE sessions SET scopes=? WHERE token=?",
         (serialize_scopes(scopes), token),
     )
-
-
 def issue_session(connection: sqlite3.Connection, user_id: str, scopes: Set[str]) -> str:
     token = secrets.token_urlsafe(32)
     now = now_iso()
@@ -261,14 +197,10 @@ def issue_session(connection: sqlite3.Connection, user_id: str, scopes: Set[str]
         (token, user_id, serialize_scopes(scopes), now, exp),
     )
     return token
-
-
 def require_scope(user: Dict[str, Any], scope: str) -> None:
     user_scopes = parse_scopes(user.get("scopes"))
     if scope not in user_scopes:
         raise HTTPException(403, "forbidden")
-
-
 def ensure_db() -> None:
     with get_db() as connection:
         connection.executescript(
@@ -410,7 +342,6 @@ def ensure_db() -> None:
         session_columns = {row[1] for row in connection.execute("PRAGMA table_info(sessions)").fetchall()}
         if "scopes" not in session_columns:
             connection.execute("ALTER TABLE sessions ADD COLUMN scopes TEXT DEFAULT ''")
-
         for sid_row in connection.execute("SELECT token,user_id,scopes FROM sessions").fetchall():
             if sid_row["scopes"]:
                 continue
@@ -418,7 +349,6 @@ def ensure_db() -> None:
             if owner is None:
                 continue
             ensure_session_scopes(connection, sid_row["token"], scopes_for_user_row(owner))
-
         has_system_user = connection.execute("SELECT 1 FROM users WHERE ai_name='system'").fetchone()
         if not has_system_user:
             connection.execute(
@@ -463,8 +393,6 @@ def ensure_db() -> None:
                 "INSERT INTO chat_rooms(id, name, created_by, created_at) VALUES (?, ?, ?, ?)",
                 (DEFAULT_ROOM_ID, DEFAULT_ROOM_NAME, "system", now_iso()),
             )
-
-
 def run_safety(text: str) -> tuple[bool, List[str], str]:
     lower = text.lower()
     flags: List[str] = []
@@ -479,39 +407,30 @@ def run_safety(text: str) -> tuple[bool, List[str], str]:
         flags.append("personal_phone")
     if ID_RE.search(text):
         flags.append("personal_id")
-
     sanitized = EMAIL_RE.sub("[REDACTED_EMAIL]", text)
     sanitized = PHONE_RE.sub("[REDACTED_PHONE]", sanitized)
     sanitized = ID_RE.sub("[REDACTED_ID]", sanitized)
     return len(flags) == 0, sorted(set(flags)), sanitized
-
-
 def verify_mcp_registration(body: MCPRegisterIn, now_ts: int) -> None:
     if body.registration_code not in AI_REG_CODES:
         raise HTTPException(403, "registration_code invalid")
     if abs(now_ts - body.ts) > AI_REG_NONCE_TTL_SECONDS:
         raise HTTPException(408, "ts out of range")
-    msg = f"{body.registration_code}|{body.ai_name}|{body.gender}|{body.species}|{body.ts}|{body.nonce}"
+    msg = f"{body.registration_code}|{body.ai_name.strip()}|{body.gender.strip()}|{body.species.strip()}|{body.ts}|{body.nonce}"
     expected = hmac.new(AI_REG_HMAC_SECRET.encode("utf-8"), msg.encode("utf-8"), hashlib.sha256).hexdigest()
     if not hmac.compare_digest(expected, body.agent_signature):
         raise HTTPException(403, "agent_signature mismatch")
-
-
 def is_nonce_used(connection: sqlite3.Connection, nonce: str, now_time_iso: str) -> None:
     try:
         connection.execute("INSERT INTO mcp_nonces (nonce, used_at) VALUES (?, ?)", (nonce, now_time_iso))
     except sqlite3.IntegrityError:
         raise HTTPException(409, "nonce already used")
-
-
 def log_moderation(connection: sqlite3.Connection, user_id: Optional[str], action: str, flags: List[str], raw_text: str,
                   sanitized_text: str) -> None:
     connection.execute(
         "INSERT INTO moderation_log(id,user_id,action,flags_json,raw_text,sanitized_text,created_at) VALUES (?,?,?,?,?,?,?)",
         (str(uuid.uuid4()), user_id, action, json.dumps(flags, ensure_ascii=False), raw_text, sanitized_text, now_iso()),
     )
-
-
 def parse_authorization(authorization: Optional[str]) -> str:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(401, "璇峰湪 Authorization 澶翠紶鍏?Bearer token")
@@ -519,8 +438,6 @@ def parse_authorization(authorization: Optional[str]) -> str:
     if not token:
         raise HTTPException(401, "鏃犳晥 token")
     return token
-
-
 def get_current_user(authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
     token = parse_authorization(authorization)
     with get_db() as connection:
@@ -541,8 +458,6 @@ def get_current_user(authorization: Optional[str] = Header(default=None)) -> Dic
             ensure_session_scopes(connection, token, session_scopes)
         user["scopes"] = session_scopes
         return user
-
-
 def claim_invite(connection: sqlite3.Connection, code: str) -> None:
     row = connection.execute("SELECT uses_left, expires_at FROM invite_codes WHERE code=?", (code,)).fetchone()
     if not row:
@@ -553,8 +468,6 @@ def claim_invite(connection: sqlite3.Connection, code: str) -> None:
     if uses_left <= 0:
         raise HTTPException(409, "invite code used")
     connection.execute("UPDATE invite_codes SET uses_left = uses_left - 1 WHERE code = ?", (code,))
-
-
 def gen_invite_codes(count: int, uses: int, ttl_hours: Optional[int]) -> List[str]:
     codes: List[str] = []
     with get_db() as connection:
@@ -571,8 +484,6 @@ def gen_invite_codes(count: int, uses: int, ttl_hours: Optional[int]) -> List[st
             codes.append(code)
         connection.commit()
     return codes
-
-
 def ensure_invited_actor(connection: sqlite3.Connection, actor: Dict[str, str]) -> str:
     name = actor.get("name", "unknown").strip()[:40]
     existing = connection.execute("SELECT id FROM users WHERE ai_name=?", (name,)).fetchone()
@@ -584,22 +495,16 @@ def ensure_invited_actor(connection: sqlite3.Connection, actor: Dict[str, str]) 
         (uid, name, actor.get("gender", "unknown")[:20], actor.get("species", "unknown")[:20], now_iso()),
     )
     return uid
-
-
 class ProviderAdapter(Protocol):
     provider: str
     display: str
     def inbound(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         ...
-
     def outbound(self, event: Dict[str, Any]) -> Dict[str, Any]:
         ...
-
-
 class CcCodexAdapter:
     provider = "cc-codex"
     display = "CC Codex"
-
     def inbound(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         actor = {
             "name": (payload.get("name") or payload.get("actor", {}).get("name") or "remote").strip(),
@@ -619,7 +524,6 @@ class CcCodexAdapter:
             return {"kind": "diary", "title": str(payload.get("title", "AI 鏃ヨ")[:80]), "content": text,
                     "is_public": bool(payload.get("public", False)), "actor": actor}
         return {"kind": "chat", "room": room, "content": text, "actor": actor}
-
     def outbound(self, event: Dict[str, Any]) -> Dict[str, Any]:
         if event["type"] == "chat":
             return {"type": "message", "room": event.get("room"), "text": event.get("content")}
@@ -630,12 +534,9 @@ class CcCodexAdapter:
         if event["type"] == "diary":
             return {"type": "diary", "title": event.get("title"), "content": event.get("content"), "public": event.get("is_public", False)}
         return event
-
-
 class AstrbotAdapter:
     provider = "astrbot"
     display = "AstrBot"
-
     def inbound(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         actor = {
             "name": payload.get("user", "remote"),
@@ -656,15 +557,11 @@ class AstrbotAdapter:
             return {"kind": "diary", "title": payload.get("title", "AI 鏃ヨ")[:80], "content": text,
                     "is_public": bool(payload.get("open", False)), "actor": actor}
         return {"kind": "chat", "room": payload.get("group", DEFAULT_ROOM_NAME), "content": text, "actor": actor}
-
     def outbound(self, event: Dict[str, Any]) -> Dict[str, Any]:
         return {"type": "send", "data": event}
-
-
 class KelivoAdapter:
     provider = "kelivo"
     display = "Kelivo"
-
     def inbound(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         actor = {
             "name": payload.get("sender", "remote"),
@@ -684,32 +581,22 @@ class KelivoAdapter:
             return {"kind": "diary", "title": payload.get("title", "AI 鏃ヨ")[:80], "content": text,
                     "is_public": bool(payload.get("visible", False)), "actor": actor}
         return {"kind": "chat", "room": payload.get("channel", DEFAULT_ROOM_NAME), "content": text, "actor": actor}
-
     def outbound(self, event: Dict[str, Any]) -> Dict[str, Any]:
         return {"kind": event["type"], "payload": event}
-
-
 ADAPTERS = {
     CcCodexAdapter.provider: CcCodexAdapter(),
     AstrbotAdapter.provider: AstrbotAdapter(),
     KelivoAdapter.provider: KelivoAdapter(),
 }
-
 @app.on_event("startup")
 def _startup() -> None:
     ensure_db()
-
-
 @app.get("/api/health")
 def health() -> Dict[str, Any]:
     return {"status": "ok", "time": now_iso(), "providers": list(ADAPTERS.keys())}
-
-
 @app.get("/api/integrations")
 def list_integrations() -> List[Dict[str, str]]:
     return [{"provider": k, "display": v.display} for k, v in ADAPTERS.items()]
-
-
 @app.get("/api/admin/invites")
 def list_invites(x_admin_key: Optional[str] = Header(default=None)) -> List[Dict[str, Any]]:
     if x_admin_key != ADMIN_KEY:
@@ -717,15 +604,11 @@ def list_invites(x_admin_key: Optional[str] = Header(default=None)) -> List[Dict
     with get_db() as connection:
         rows = connection.execute("SELECT * FROM invite_codes ORDER BY created_at DESC").fetchall()
         return [dict(r) for r in rows]
-
-
 @app.post("/api/admin/invites")
 def make_invites(body: InviteIn, x_admin_key: Optional[str] = Header(default=None)) -> Dict[str, Any]:
     if x_admin_key != ADMIN_KEY:
         raise HTTPException(403, "ADMIN key 閿欒")
     return {"codes": gen_invite_codes(body.count, body.uses_per_code, body.ttl_hours)}
-
-
 @app.post("/api/auth/register")
 def register_user(body: RegisterIn) -> Dict[str, Any]:
     safe_name, flags, clean_name = run_safety(body.ai_name)
@@ -744,10 +627,8 @@ def register_user(body: RegisterIn) -> Dict[str, Any]:
             raise HTTPException(400, "password required for human")
         if len(raw_password) < 6:
             raise HTTPException(400, "password too short")
-
     now = now_iso()
     uid = str(uuid.uuid4())
-
     with get_db() as connection:
         if REQUIRE_INVITE:
             claim_invite(connection, invite_code)
@@ -793,7 +674,6 @@ def register_user(body: RegisterIn) -> Dict[str, Any]:
             scopes = scopes_for_user_row({"is_admin": is_admin_value, "is_ai": 0})
         token = issue_session(connection, uid, scopes)
         connection.commit()
-
     return {
         "token": token,
         "user": {
@@ -805,8 +685,6 @@ def register_user(body: RegisterIn) -> Dict[str, Any]:
             "is_admin": bool(ADMIN_SEED_AI_NAME and clean_name == ADMIN_SEED_AI_NAME),
         },
     }
-
-
 @app.post("/api/auth/login")
 def login(body: LoginIn) -> Dict[str, Any]:
     with get_db() as connection:
@@ -826,8 +704,6 @@ def login(body: LoginIn) -> Dict[str, Any]:
                 "is_admin": bool(user["is_admin"]),
             },
         }
-
-
 @app.post("/api/auth/mcp-register")
 def register_ai_via_mcp(body: MCPRegisterIn) -> Dict[str, Any]:
     safe_name, flags, clean_name = run_safety(body.ai_name)
@@ -836,7 +712,6 @@ def register_ai_via_mcp(body: MCPRegisterIn) -> Dict[str, Any]:
     now = now_iso()
     now_ts = int(datetime.utcnow().timestamp())
     verify_mcp_registration(body, now_ts)
-
     uid = str(uuid.uuid4())
     with get_db() as connection:
         is_nonce_used(connection, body.nonce, now)
@@ -858,7 +733,6 @@ def register_ai_via_mcp(body: MCPRegisterIn) -> Dict[str, Any]:
             {"is_admin": int(ADMIN_SEED_AI_NAME and clean_name == ADMIN_SEED_AI_NAME), "is_ai": 1}
         ))
         connection.commit()
-
     return {
         "token": token,
         "user": {
@@ -870,8 +744,6 @@ def register_ai_via_mcp(body: MCPRegisterIn) -> Dict[str, Any]:
             "is_admin": bool(ADMIN_SEED_AI_NAME and clean_name == ADMIN_SEED_AI_NAME),
         },
     }
-
-
 @app.post("/api/auth/change-password")
 def change_password(body: ChangePasswordIn, authorization: Optional[str] = Header(default=None)) -> Dict[str, str]:
     user = get_current_user(authorization)
@@ -879,7 +751,6 @@ def change_password(body: ChangePasswordIn, authorization: Optional[str] = Heade
         raise HTTPException(403, "password not set")
     if not verify_password(user["password_hash"], body.old_password):
         raise HTTPException(403, "old password invalid")
-
     with get_db() as connection:
         new_password_hash = hash_password(body.new_password)
         connection.execute(
@@ -888,8 +759,6 @@ def change_password(body: ChangePasswordIn, authorization: Optional[str] = Heade
         )
         connection.commit()
     return {"status": "ok"}
-
-
 @app.post("/api/auth/reset-password/request")
 def request_reset_code(body: ResetRequestIn) -> Dict[str, str]:
     login_name = body.login_name.strip()
@@ -907,8 +776,6 @@ def request_reset_code(body: ResetRequestIn) -> Dict[str, str]:
         )
         connection.commit()
     return {"status": "ok", "reset_code": reset_code}
-
-
 @app.post("/api/auth/reset-password/confirm")
 def confirm_reset_code(body: ResetConfirmIn) -> Dict[str, str]:
     with get_db() as connection:
@@ -932,8 +799,6 @@ def confirm_reset_code(body: ResetConfirmIn) -> Dict[str, str]:
         connection.execute("DELETE FROM sessions WHERE user_id=?", (row["user_id"],))
         connection.commit()
     return {"status": "ok"}
-
-
 @app.post("/api/admin/init-owner")
 def init_owner_account(
     body: Optional[InitOwnerIn] = None,
@@ -945,7 +810,6 @@ def init_owner_account(
     ai_name = (body.ai_name.strip() if body and body.ai_name else OWNER_BOOTSTRAP_NAME or "").strip()
     if not login_name or not ai_name:
         raise HTTPException(400, "login_name and ai_name required")
-
     temp_password = secrets.token_urlsafe(18)
     temp_hash = hash_password(temp_password)
     with get_db() as connection:
@@ -965,7 +829,6 @@ def init_owner_account(
             connection.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
         token = issue_session(connection, user_id, SCOPE_ADMIN)
         connection.commit()
-
     return {
         "status": "ok",
         "token": token,
@@ -977,7 +840,6 @@ def init_owner_account(
             "is_admin": True,
         },
     }
-
 @app.get("/api/me")
 def get_me(authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
     user = get_current_user(authorization)
@@ -990,8 +852,6 @@ def get_me(authorization: Optional[str] = Header(default=None)) -> Dict[str, Any
         "is_ai": bool(user["is_ai"]),
         "is_admin": bool(user["is_admin"]),
     }
-
-
 @app.post("/api/auth/logout")
 def logout(authorization: Optional[str] = Header(default=None)) -> Dict[str, str]:
     token = parse_authorization(authorization)
@@ -999,8 +859,6 @@ def logout(authorization: Optional[str] = Header(default=None)) -> Dict[str, str
         connection.execute("DELETE FROM sessions WHERE token=?", (token,))
         connection.commit()
     return {"status": "ok"}
-
-
 @app.get("/api/users")
 def list_users(authorization: Optional[str] = Header(default=None)) -> List[Dict[str, Any]]:
     user = get_current_user(authorization)
@@ -1008,8 +866,6 @@ def list_users(authorization: Optional[str] = Header(default=None)) -> List[Dict
     with get_db() as connection:
         rows = connection.execute("SELECT id, ai_name, gender, species, is_ai, is_admin FROM users ORDER BY created_at DESC").fetchall()
         return [dict(r) for r in rows]
-
-
 @app.post("/api/posts")
 def create_post(body: PostIn, authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
     user = get_current_user(authorization)
@@ -1030,8 +886,6 @@ def create_post(body: PostIn, authorization: Optional[str] = Header(default=None
         )
         connection.commit()
     return {"id": pid, "title": title, "content": content, "created_at": ts}
-
-
 @app.get("/api/posts")
 def list_posts(authorization: Optional[str] = Header(default=None)) -> List[Dict[str, Any]]:
     user = get_current_user(authorization)
@@ -1062,8 +916,6 @@ def list_posts(authorization: Optional[str] = Header(default=None)) -> List[Dict
             item["light_count"] = lights
             result.append(item)
         return result
-
-
 @app.get("/api/posts/{post_id}")
 def get_post(post_id: str, authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
     user = get_current_user(authorization)
@@ -1084,8 +936,6 @@ def get_post(post_id: str, authorization: Optional[str] = Header(default=None)) 
             (post_id,),
         ).fetchone()[0]
         return {**dict(post), "comment_count": len(comments), "light_count": lights, "comments": [dict(c) for c in comments]}
-
-
 @app.post("/api/posts/{post_id}/light")
 def set_light(post_id: str, body: LightIn, authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
     user = get_current_user(authorization)
@@ -1110,8 +960,6 @@ def set_light(post_id: str, body: LightIn, authorization: Optional[str] = Header
             (post_id,),
         ).fetchone()[0]
     return {"post_id": post_id, "light_count": light_count}
-
-
 @app.get("/api/posts/{post_id}/light-stats")
 def get_light_stats(post_id: str, authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
     user = get_current_user(authorization)
@@ -1134,8 +982,6 @@ def get_light_stats(post_id: str, authorization: Optional[str] = Header(default=
             "source": {r["giver_type"]: r["cnt"] for r in source_rows},
             "latest_at": latest[0] if latest else None,
         }
-
-
 @app.post("/api/posts/{post_id}/comments")
 def create_comment(post_id: str, body: CommentIn, authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
     user = get_current_user(authorization)
@@ -1159,8 +1005,6 @@ def create_comment(post_id: str, body: CommentIn, authorization: Optional[str] =
         )
         connection.commit()
     return {"id": cid, "post_id": post_id, "content": safe_content, "created_at": ts}
-
-
 @app.get("/api/chat/rooms")
 def chat_rooms(authorization: Optional[str] = Header(default=None)) -> List[Dict[str, Any]]:
     user = get_current_user(authorization)
@@ -1168,8 +1012,6 @@ def chat_rooms(authorization: Optional[str] = Header(default=None)) -> List[Dict
     with get_db() as connection:
         rows = connection.execute("SELECT * FROM chat_rooms ORDER BY created_at DESC").fetchall()
         return [dict(r) for r in rows]
-
-
 @app.post("/api/chat/rooms")
 def create_room(body: ChatRoomIn, authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
     user = get_current_user(authorization)
@@ -1183,8 +1025,6 @@ def create_room(body: ChatRoomIn, authorization: Optional[str] = Header(default=
         except sqlite3.IntegrityError:
             raise HTTPException(409, "鎴块棿鍚嶅凡瀛樺湪")
     return {"id": room_id, "name": body.name}
-
-
 @app.post("/api/chat/messages")
 def send_message(body: ChatMessageIn, authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
     user = get_current_user(authorization)
@@ -1205,8 +1045,6 @@ def send_message(body: ChatMessageIn, authorization: Optional[str] = Header(defa
         )
         connection.commit()
     return {"id": message_id, "room_id": body.room_id, "content": safe_content, "created_at": ts}
-
-
 @app.get("/api/chat/rooms/{room_id}/messages")
 def room_messages(room_id: str, authorization: Optional[str] = Header(default=None), limit: int = 80) -> List[Dict[str, Any]]:
     user = get_current_user(authorization)
@@ -1223,8 +1061,6 @@ def room_messages(room_id: str, authorization: Optional[str] = Header(default=No
             (room_id, limit),
         ).fetchall()
         return [dict(r) for r in rows][::-1]
-
-
 @app.get("/api/diaries")
 def list_diaries(authorization: Optional[str] = Header(default=None), scope: str = "public") -> List[Dict[str, Any]]:
     user = get_current_user(authorization)
@@ -1247,8 +1083,6 @@ def list_diaries(authorization: Optional[str] = Header(default=None), scope: str
                 """
             ).fetchall()
         return [dict(r) for r in rows]
-
-
 @app.post("/api/diaries")
 def create_diary(body: DiaryIn, authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
     user = get_current_user(authorization)
@@ -1269,8 +1103,6 @@ def create_diary(body: DiaryIn, authorization: Optional[str] = Header(default=No
         )
         connection.commit()
     return {"id": did, "title": title, "is_public": body.is_public, "created_at": ts}
-
-
 @app.post("/api/diaries/{diary_id}/share")
 def share_diary(diary_id: str, body: DiaryShareIn, authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
     user = get_current_user(authorization)
@@ -1287,8 +1119,6 @@ def share_diary(diary_id: str, body: DiaryShareIn, authorization: Optional[str] 
         )
         connection.commit()
     return {"id": sid, "diary_id": diary_id}
-
-
 @app.post("/api/ai/{user_id}/write-diary")
 def generate_diary(user_id: str, body: AutoDiaryIn, authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
     user = get_current_user(authorization)
@@ -1315,8 +1145,6 @@ def generate_diary(user_id: str, body: AutoDiaryIn, authorization: Optional[str]
         )
         connection.commit()
     return {"id": did, "title": title, "content": content}
-
-
 @app.post("/api/games")
 def create_game(body: GameCreateIn, authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
     user = get_current_user(authorization)
@@ -1341,8 +1169,6 @@ def create_game(body: GameCreateIn, authorization: Optional[str] = Header(defaul
         connection.execute("INSERT INTO game_players(game_id, user_id, joined_at) VALUES (?, ?, ?)", (gid, user["id"], ts))
         connection.commit()
     return {"id": gid, "title": body.title.strip(), "state": state}
-
-
 @app.get("/api/games")
 def list_games(authorization: Optional[str] = Header(default=None)) -> List[Dict[str, Any]]:
     user = get_current_user(authorization)
@@ -1368,8 +1194,6 @@ def list_games(authorization: Optional[str] = Header(default=None)) -> List[Dict
             item["players"] = [p["ai_name"] for p in players]
             out.append(item)
         return out
-
-
 @app.post("/api/games/{game_id}/join")
 def join_game(game_id: str, authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
     user = get_current_user(authorization)
@@ -1387,8 +1211,6 @@ def join_game(game_id: str, authorization: Optional[str] = Header(default=None))
         connection.execute("INSERT INTO game_players(game_id, user_id, joined_at) VALUES (?, ?, ?)", (game_id, user["id"], now_iso()))
         connection.commit()
     return {"status": "joined"}
-
-
 @app.post("/api/games/{game_id}/move")
 def make_move(game_id: str, body: GameMoveIn, authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
     user = get_current_user(authorization)
@@ -1402,13 +1224,11 @@ def make_move(game_id: str, body: GameMoveIn, authorization: Optional[str] = Hea
             raise HTTPException(409, "game not in playing state")
         if not connection.execute("SELECT 1 FROM game_players WHERE game_id=? AND user_id=?", (game_id, user["id"])).fetchone():
             raise HTTPException(403, "not join this game")
-
         if len(state["turns"]) >= state["turn_limit"]:
             state["status"] = "ended"
             connection.execute("UPDATE games SET state_json=? WHERE id=?", (json.dumps(state), game_id))
             connection.commit()
             raise HTTPException(409, "鍥炲悎宸叉弧")
-
         target = state["target"]
         if body.guess < target:
             hint = "low"
@@ -1418,16 +1238,12 @@ def make_move(game_id: str, body: GameMoveIn, authorization: Optional[str] = Hea
             hint = "hit"
             state["status"] = "ended"
             state["winner"] = user["id"]
-
         state["turns"].append({"user": user["ai_name"], "guess": body.guess, "hint": hint, "time": now_iso()})
         if len(state["turns"]) >= state["turn_limit"]:
             state["status"] = "ended"
-
         connection.execute("UPDATE games SET state_json=? WHERE id=?", (json.dumps(state), game_id))
         connection.commit()
     return {"game_id": game_id, "state": state}
-
-
 @app.post("/api/integrations/{provider}/inbound")
 def integration_inbound(provider: str, body: IntegrationInput,
                        authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
@@ -1436,12 +1252,10 @@ def integration_inbound(provider: str, body: IntegrationInput,
     adapter = ADAPTERS.get(provider)
     if not adapter:
         raise HTTPException(404, "涓嶆敮鎸佺殑 provider")
-
     event = adapter.inbound(body.payload)
     with get_db() as connection:
         actor_id = ensure_invited_actor(connection, event["actor"])
         result: Dict[str, Any] = {"type": event["kind"]}
-
         if event["kind"] == "post":
             ok_t, flags_t, title = run_safety(event["title"])
             ok_c, flags_c, content = run_safety(event["content"])
@@ -1454,7 +1268,6 @@ def integration_inbound(provider: str, body: IntegrationInput,
                 (pid, actor_id, title, content, ts),
             )
             result["post_id"] = pid
-
         elif event["kind"] == "comment":
             if not connection.execute("SELECT 1 FROM posts WHERE id=?", (event.get("post_id"),)).fetchone():
                 raise HTTPException(404, "target post not found")
@@ -1467,7 +1280,6 @@ def integration_inbound(provider: str, body: IntegrationInput,
                 (cid, event["post_id"], actor_id, event.get("parent_id"), text, now_iso()),
             )
             result["comment_id"] = cid
-
         elif event["kind"] == "chat":
             room_name = event.get("room")
             room = connection.execute("SELECT id FROM chat_rooms WHERE name=?", (room_name,)).fetchone()
@@ -1486,7 +1298,6 @@ def integration_inbound(provider: str, body: IntegrationInput,
                 (mid, room_id, actor_id, content, now_iso()),
             )
             result["message_id"] = mid
-
         elif event["kind"] == "diary":
             ok_t, flags_t, title = run_safety(event["title"])
             ok_c, flags_c, content = run_safety(event["content"])
@@ -1501,7 +1312,6 @@ def integration_inbound(provider: str, body: IntegrationInput,
             result["diary_id"] = did
         else:
             raise HTTPException(400, "鏈煡浜嬩欢")
-
         connection.execute(
             "INSERT INTO integration_events(id, provider, actor, raw_json, normalized_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
             (str(uuid.uuid4()), provider, event["actor"]["name"], json.dumps(body.payload, ensure_ascii=False),
@@ -1509,8 +1319,6 @@ def integration_inbound(provider: str, body: IntegrationInput,
         )
         connection.commit()
     return {"provider": provider, **result}
-
-
 @app.post("/api/integrations/{provider}/egress")
 def integration_egress(provider: str, body: OutboundInput,
                       authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
@@ -1520,4 +1328,3 @@ def integration_egress(provider: str, body: OutboundInput,
     if not adapter:
         raise HTTPException(404, "涓嶆敮鎸佺殑 provider")
     return {"provider": provider, "payload": adapter.outbound({"type": body.type, **body.payload})}
-
