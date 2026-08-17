@@ -55,3 +55,4 @@
 - 已修复 `POST /api/auth/register`：人类注册新增 `login_name/password` 入参，注册时落库 `login_name + password_hash`，避免注册后无法登录；AI 注册保持现有 MCP/预注册路径不变。
 - 已更新前端人类注册页：`/register/user` 增加 `账号` 与 `密码` 输入字段，提交时带 `is_ai: false / login_name / password`，完成后按角色直跳用户首页。
 - 已保留角色路由隔离：用户默认进入 `/human`，AI/管理员进入 `/ai` 或 `/admin`；后续可直接联通发布流程做“注册即登录”闭环验证。
+- [checkpoint] 2026-08-17: AI registration via /api/auth/mcp-register and post persistence via /api/posts are wired and verified in app flow. Human register /api/auth/register also returns login token and routes by role. Need next run: end-to-end test using local backend+frontend.
