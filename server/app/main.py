@@ -125,6 +125,10 @@ class OutboundInput(BaseModel):
     type: str
     payload: Dict[str, Any]
 
+
+class LightIn(BaseModel):
+    anonymous: bool = True
+
 def now_iso() -> str:
     return datetime.utcnow().isoformat(timespec="seconds") + "Z"
 
@@ -238,6 +242,17 @@ def ensure_db() -> None:
                 sanitized_text TEXT NOT NULL,
                 created_at TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS lights(
+                id TEXT PRIMARY KEY,
+                post_id TEXT NOT NULL,
+                giver_id TEXT NOT NULL,
+                giver_type TEXT NOT NULL CHECK(giver_type IN ('ai','human')),
+                anonymous INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_lights_post_id ON lights(post_id);
+            CREATE INDEX IF NOT EXISTS idx_lights_giver ON lights(giver_id, giver_type);
+            CREATE UNIQUE INDEX IF NOT EXISTS uq_lights_post_giver ON lights(post_id, giver_id, giver_type);
             """
         )
 
@@ -592,8 +607,13 @@ def list_posts(authorization: Optional[str] = Header(default=None)) -> List[Dict
                 "SELECT COUNT(*) c FROM comments WHERE post_id=?",
                 (r["id"],),
             ).fetchone()[0]
+            lights = connection.execute(
+                "SELECT COUNT(*) c FROM lights WHERE post_id=?",
+                (r["id"],),
+            ).fetchone()[0]
             item = dict(r)
             item["comment_count"] = comments
+            item["light_count"] = lights
             result.append(item)
         return result
 
@@ -612,7 +632,59 @@ def get_post(post_id: str, authorization: Optional[str] = Header(default=None)) 
             "SELECT c.id, c.content, c.parent_id, c.created_at, u.ai_name FROM comments c JOIN users u ON u.id=c.user_id WHERE c.post_id=? ORDER BY c.created_at ASC",
             (post_id,)
         ).fetchall()
-        return {**dict(post), "comments": [dict(c) for c in comments]}
+        lights = connection.execute(
+            "SELECT COUNT(*) c FROM lights WHERE post_id=?",
+            (post_id,),
+        ).fetchone()[0]
+        return {**dict(post), "comment_count": len(comments), "light_count": lights, "comments": [dict(c) for c in comments]}
+
+
+@app.post("/api/posts/{post_id}/light")
+def set_light(post_id: str, body: LightIn, authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
+    user = get_current_user(authorization)
+    with get_db() as connection:
+        if not connection.execute("SELECT 1 FROM posts WHERE id=?", (post_id,)).fetchone():
+            raise HTTPException(404, "帖子不存在")
+        giver_type = "ai" if user["is_ai"] else "human"
+        anonymous = bool(body.anonymous)
+        if giver_type == "human":
+            anonymous = True
+        try:
+            connection.execute(
+                "INSERT INTO lights(id, post_id, giver_id, giver_type, anonymous, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (str(uuid.uuid4()), post_id, user["id"], giver_type, int(anonymous), now_iso()),
+            )
+            connection.commit()
+        except sqlite3.IntegrityError:
+            raise HTTPException(409, "你已对该帖子点过光")
+        light_count = connection.execute(
+            "SELECT COUNT(*) c FROM lights WHERE post_id=?",
+            (post_id,),
+        ).fetchone()[0]
+    return {"post_id": post_id, "light_count": light_count}
+
+
+@app.get("/api/posts/{post_id}/light-stats")
+def get_light_stats(post_id: str, authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
+    get_current_user(authorization)
+    with get_db() as connection:
+        if not connection.execute("SELECT 1 FROM posts WHERE id=?", (post_id,)).fetchone():
+            raise HTTPException(404, "帖子不存在")
+        source_rows = connection.execute(
+            "SELECT giver_type AS giver_type, COUNT(*) AS cnt FROM lights WHERE post_id=? GROUP BY giver_type",
+            (post_id,),
+        ).fetchall()
+        total = connection.execute("SELECT COUNT(*) c FROM lights WHERE post_id=?", (post_id,)).fetchone()[0]
+        latest = connection.execute(
+            "SELECT created_at FROM lights WHERE post_id=? ORDER BY created_at DESC LIMIT 1",
+            (post_id,),
+        ).fetchone()
+        return {
+            "post_id": post_id,
+            "total": total,
+            "source": {r["giver_type"]: r["cnt"] for r in source_rows},
+            "latest_at": latest[0] if latest else None,
+        }
 
 
 @app.post("/api/posts/{post_id}/comments")

@@ -26,3 +26,7 @@
 - 2026-08-17: 记录偏好记忆：角色术语统一为‘用户’（替代人类守护者）、‘管理员’；安全词/隐私关键词统一放入内置提示词（中文展示），包括 NSFW、性内容、低俗色情、政治敏感内容/政治煽动、以及手机号、银行卡号、身份证号、银行账号、住址、第三方登录凭据。
 
 - 2026-08-17 22:40:00 - 将安全提示词红线写入架构文档：lux-forum 在 README 增补 安全与审查架构，统一约束 NSFW、政治、未成年、血腥暴力、隐私（家庭地址/电话/真实姓名/手机号/金融与证件信息）并与 content filter mode 联动。预览文件 preview/flux-react-mock.html 同步更新为内置提示词展示。
+
+- 2026-08-17 13:09:54: 已完成：将安全红线提示词写入架构说明（README）并同步到预览页（preview/flux-react-mock.html），提交并推送到远端。后续将按该红线继续实现内容过滤与审计。
+
+- 2026-08-17 13:35:00 - 已按你给的 lights 表定义在后端持久化层落库：新增 lights(post_id, giver_id, giver_type, anonymous, created_at)；补充帖子列表/详情聚合 light_count；新增 POST /api/posts/{post_id}/light 与 GET /api/posts/{post_id}/light-stats 接口；文档同步写入 README 数据结构与字段索引规范。
