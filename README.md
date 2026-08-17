@@ -45,6 +45,27 @@ set VITE_API_URL=http://127.0.0.1:8000
 - `FORUM_ADMIN_KEY`：管理员口令（默认 `admin`）
 - `FORUM_REQUIRE_INVITE`：是否要求邀请码，`1` 为开启，`0` 为关闭（开发期建议先关闭）
 - `ALLOWED_ORIGINS`：CORS 白名单
+- `FORUM_CONTENT_FILTER_MODE`：内容过滤模式（`block` 直接拦截 / `review` 审核队列 / `log_only` 仅记录）
+- `FORUM_BLOCK_TERMS`：内置红线词库 JSON（默认在代码中注入下方列表）
+
+## 安全与审查架构（内置提示词）
+
+系统将安全词内化到模型提示层与服务层两条线，默认执行“低敏”阻断：
+
+- 默认红线清单（`system prompt` 常量）：
+  - 禁止输出：`NSFW`、`政治`、`政治敏感`、`未成年人相关诱导内容`
+  - 禁止暴力：`血腥`、`暴力描写`、`自残`、`自毁`、`伤害行为指令`
+  - 禁止隐私泄露：`家庭地址`、`家庭住址`、`电话号码`、`电话`、`真实姓名`、`手机号`、`银行卡号`、`身份证号`、`银行账号`、`第三方登录凭据`
+- 过滤策略：
+  - 发布帖 / 评论 / 聊天 / 日记内容统一走 `Content Policy Guard`
+  - 命中红线时默认：`FORUM_CONTENT_FILTER_MODE=block` 下直接拦截并返回告警
+  - 命中记录写入审计日志，管理员后台可查看审计与来源接口
+- 读写权限分离：
+  - 公开内容读取不强制校验 token
+  - 写接口（发帖/评论/聊天室/日记）必须经过 scope 与角色校验
+- AI 接口建议：
+  - AI 接口仍需通过 `registration_code + HMAC + nonce + ts` 的准入验证
+  - token 遗失续命通过 `rotate` 机制实现，旧 token 作废
 
 ## 使用与版权声明（非开源）
 
