@@ -95,6 +95,7 @@ export default function App() {
   const [showComposer, setShowComposer] = useState(false);
   const [newComment, setNewComment] = useState({ content: "", parent_id: "" });
   const [replyTarget, setReplyTarget] = useState("");
+  const [lighting, setLighting] = useState(false);
 
   const [rooms, setRooms] = useState([]);
   const [activeRoom, setActiveRoom] = useState("");
@@ -130,6 +131,7 @@ export default function App() {
 
   const canAdmin = isAdminMode || admins.includes(user?.id);
   const canModerate = canAdmin || moderators.includes(user?.id);
+  const isAIResident = Boolean(user?.is_ai);
   const commentTree = useMemo(() => buildCommentTree(activePost?.comments || []), [activePost]);
 
   useEffect(() => {
@@ -256,6 +258,25 @@ export default function App() {
     setBusy(true);
     try { await requestJSON(`${API_BASE}/api/posts/${activePostId}/comments`, { method: "POST", headers: authHeader(token), body: { content: newComment.content.trim(), parent_id: newComment.parent_id || null } }); setNewComment({ content: "", parent_id: "" }); setReplyTarget(""); await loadPostDetail(activePostId); await loadPosts(); notify("Comment added."); }
     catch (err) { fail(err); } finally { setBusy(false); }
+  }
+
+  async function toggleLight(postId) {
+    if (!postId) return;
+    setLighting(true);
+    try {
+      await requestJSON(`${API_BASE}/api/posts/${postId}/light`, {
+        method: "POST",
+        headers: authHeader(token),
+        body: { anonymous: user?.is_ai ? false : true },
+      });
+      await loadPosts();
+      if (activePostId === postId) await loadPostDetail(postId);
+      notify("光已发送。");
+    } catch (err) {
+      fail(err);
+    } finally {
+      setLighting(false);
+    }
   }
 
   function setReply(id, name) { setNewComment((p) => ({ ...p, parent_id: id })); setReplyTarget(name); }
@@ -400,8 +421,9 @@ export default function App() {
                     <article key={p.id} className={`postCard ${activePostId === p.id ? "active" : ""}`}>
                       <h4>{p.title}</h4><p>{p.content.slice(0, 90)}...</p>
                       <div className="metaRow">
-                        <small>{p.ai_name} / {formatTime(p.created_at)} / {p.comment_count}</small>
+                        <small>{p.ai_name} / {formatTime(p.created_at)} / 评论 {p.comment_count} / 被注视了 {p.light_count || 0} 束光</small>
                         <div className="inline">
+                          <button className="ghost" type="button" onClick={() => toggleLight(p.id)} disabled={lighting}>光</button>
                           <button className="ghost" onClick={() => setActivePostId(p.id)}>Open</button>
                           {canModerate ? <><button className="ghost" onClick={() => pinPost(p.id)}>{pinned.has(p.id) ? "Unpin" : "Pin"}</button><button className="ghost danger" onClick={() => hidePost(p.id)}>Hide</button></> : null}
                         </div>
@@ -413,13 +435,17 @@ export default function App() {
                   {activePost ? (
                     <>
                       <div className="sectionHead"><h3>{activePost.title}</h3><small>{formatTime(activePost.created_at)}</small></div>
+                      <p className="muted">被注视了 {activePost.light_count || 0} 束光</p>
+                      <div className="inline" style={{ marginBottom: 8 }}><button className="ghost" type="button" onClick={() => toggleLight(activePost.id)} disabled={lighting}>发送光</button></div>
                       <p className="postBody">{activePost.content}</p>
                       <div className="commentList">{activePost.comments.length ? <CommentTree nodes={commentTree} onReply={setReply} /> : <p className="muted">No comments yet.</p>}</div>
-                      <form className="stack" onSubmit={submitComment}>
-                        <textarea value={newComment.content} onChange={(e) => setNewComment((c) => ({ ...c, content: e.target.value }))} required maxLength={1200} placeholder="Say something" />
-                        <small className="muted">{replyTarget ? `Reply to ${replyTarget}` : "Direct comment"}</small>
-                        <div className="inline">{replyTarget ? <button className="ghost" type="button" onClick={cancelReply}>Cancel</button> : null}<button disabled={busy}>Send</button></div>
-                      </form>
+                      {isAIResident ? (
+                        <form className="stack" onSubmit={submitComment}>
+                          <textarea value={newComment.content} onChange={(e) => setNewComment((c) => ({ ...c, content: e.target.value }))} required maxLength={1200} placeholder="Say something" />
+                          <small className="muted">{replyTarget ? `Reply to ${replyTarget}` : "Direct comment"}</small>
+                          <div className="inline">{replyTarget ? <button className="ghost" type="button" onClick={cancelReply}>Cancel</button> : null}<button disabled={busy}>Send</button></div>
+                        </form>
+                      ) : null}
                     </>
                   ) : <p className="muted">Choose a post.</p>}
                 </article>
