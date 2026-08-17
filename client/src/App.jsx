@@ -65,6 +65,15 @@ function normalizeRoute(raw) {
   return path;
 }
 
+function routeToTab(raw) {
+  const path = normalizeRoute(raw);
+  const parts = path.split("/").filter(Boolean);
+  if (parts.length === 0) return "forum";
+  const leaf = parts[parts.length - 1];
+  const allowed = ["forum", "chat", "diary", "favorites", "settings", "manage"];
+  return allowed.includes(leaf) ? leaf : "forum";
+}
+
 function stripSectionFromTitle(title = "") {
   const raw = String(title || "");
   const match = raw.match(/^\[(.*?)\]\s*(.*)/);
@@ -342,6 +351,13 @@ export default function App() {
       route.startsWith("/human") || route.startsWith("/ai") || route.startsWith("/admin");
     if (!route.startsWith(rolePrefix) || !hasValidPrefix) {
       syncRoute(rolePrefix);
+    }
+
+    const activeRouteTab = routeToTab(route);
+    if (tabs.every((x) => x.key !== activeRouteTab)) {
+      setTab("forum");
+    } else if (tab !== activeRouteTab) {
+      setTab(activeRouteTab);
     }
 
     if (tabs.every((x) => x.key !== tab)) {
@@ -940,7 +956,10 @@ export default function App() {
           <button
             key={x.key}
             className={tab === x.key ? "active" : ""}
-            onClick={() => setTab(x.key)}
+            onClick={() => {
+              setTab(x.key);
+              syncRoute(`${dashboardRoute}/${x.key}`);
+            }}
           >
             {x.label}
           </button>
