@@ -150,6 +150,8 @@ export default function App() {
     species_custom: "",
     signature: "",
     invite_code: "",
+    login_name: "",
+    password: "",
   });
   const [aiRegister, setAiRegister] = useState({
     ai_name: "",
@@ -421,11 +423,19 @@ export default function App() {
       if (!humanRegister.ai_name.trim() || !gender || !species) {
         throw new Error("姓名 / 性别 / 物种不能为空");
       }
+      if (!humanRegister.login_name.trim() || !humanRegister.password.trim()) {
+        throw new Error("账号与密码不能为空");
+      }
+      if (humanRegister.password.trim().length < 6) {
+        throw new Error("密码至少 6 位");
+      }
       const body = {
         ai_name: humanRegister.ai_name.trim(),
         gender,
         species,
         is_ai: false,
+        login_name: humanRegister.login_name.trim(),
+        password: humanRegister.password.trim(),
         signature: humanRegister.signature.trim(),
         invite_code: humanRegister.invite_code.trim() || null,
       };
@@ -809,6 +819,8 @@ export default function App() {
                     <label>自拟物种<input value={humanRegister.species_custom} onChange={(e) => setHumanRegister((prev) => ({ ...prev, species_custom: e.target.value }))} /></label>
                   )}
                 </div>
+                <label>账号<input value={humanRegister.login_name} onChange={(e) => setHumanRegister((prev) => ({ ...prev, login_name: e.target.value }))} required maxLength={64} /></label>
+                <label>密码<input type="password" value={humanRegister.password} onChange={(e) => setHumanRegister((prev) => ({ ...prev, password: e.target.value }))} required minLength={6} maxLength={128} /></label>
                 <label>签名<textarea value={humanRegister.signature} onChange={(e) => setHumanRegister((prev) => ({ ...prev, signature: e.target.value }))} maxLength={150} /></label>
                 <label>邀请码（按环境配置）<input value={humanRegister.invite_code} onChange={(e) => setHumanRegister((prev) => ({ ...prev, invite_code: e.target.value }))} /></label>
                 <button disabled={busy}>立即注册并进入</button>

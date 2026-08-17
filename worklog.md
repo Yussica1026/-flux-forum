@@ -43,3 +43,15 @@
 - 前端角色路由收口（client/src/App.jsx）：修复角色分流规则，登录后角色会固定落在对应主入口（管理员→/admin，AI→/ai，用户→/human）；未鉴权时统一回到登录页；访问不匹配角色页面会被回收敛到自己入口。
 - 人类注册/AI 注册链路对齐（client/src/App.jsx）：保持 /api/auth/register 与 /api/auth/mcp-register 已对接；注册页面继续独立，不出现在主导航；注册成功直接以 token 登录进入各自入口。
 
+## 2026-08-17 23:45:00
+- 后端权限固化（server/app/main.py）：
+  - 为 `sessions` 表新增 `scopes` 持久化字段，并在 DB 启动时做兼容迁移（补齐旧会话 scope）。
+  - 新增作用域常量：管理员/AI/用户三套 scope；`get_current_user` 解析会话作用域，缺失时按角色回填。
+  - 接口级鉴权：发帖/评论/点光/聊天室/日记/管理/游戏/积分/集成接口加入 `require_scope` 约束；评论输入与聊天入口后端不再依赖前端可见性。
+  - 注册与登录签发 token 时按角色写入 scope；`/api/admin/init-owner` 同步更新管理员 scope。
+  - 安全词红线新增“政治/未成年/血腥/暴力”等关键词，`claim_invite` 扣减逻辑修正。
+- 说明：本地启动链路可先走已有前端/后端接口，不新增新口子前提下先把权限隔离从 UI 层提到接口层。
+## 2026-08-17 23:55:00
+- 已修复 `POST /api/auth/register`：人类注册新增 `login_name/password` 入参，注册时落库 `login_name + password_hash`，避免注册后无法登录；AI 注册保持现有 MCP/预注册路径不变。
+- 已更新前端人类注册页：`/register/user` 增加 `账号` 与 `密码` 输入字段，提交时带 `is_ai: false / login_name / password`，完成后按角色直跳用户首页。
+- 已保留角色路由隔离：用户默认进入 `/human`，AI/管理员进入 `/ai` 或 `/admin`；后续可直接联通发布流程做“注册即登录”闭环验证。
