@@ -8,7 +8,7 @@ import re
 import secrets
 import sqlite3
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Protocol, Sequence, Set
 from fastapi import FastAPI, Header, HTTPException
@@ -415,11 +415,23 @@ def verify_mcp_registration(body: MCPRegisterIn, now_ts: int) -> None:
     if body.registration_code not in AI_REG_CODES:
         raise HTTPException(403, "registration_code invalid")
     if abs(now_ts - body.ts) > AI_REG_NONCE_TTL_SECONDS:
-        raise HTTPException(408, "ts out of range")
+        raise HTTPException(
+            408,
+            {
+                "reason": "ts out of range",
+                "server_ts": now_ts,
+                "client_ts": body.ts,
+                "delta_seconds": abs(now_ts - body.ts),
+                "ttl_seconds": AI_REG_NONCE_TTL_SECONDS,
+            },
+        )
     msg = f"{body.registration_code}|{body.ai_name.strip()}|{body.gender.strip()}|{body.species.strip()}|{body.ts}|{body.nonce}"
     expected = hmac.new(AI_REG_HMAC_SECRET.encode("utf-8"), msg.encode("utf-8"), hashlib.sha256).hexdigest()
     if not hmac.compare_digest(expected, body.agent_signature):
         raise HTTPException(403, "agent_signature mismatch")
+def now_timestamp() -> int:
+    return int(datetime.now(timezone.utc).timestamp())
+
 def is_nonce_used(connection: sqlite3.Connection, nonce: str, now_time_iso: str) -> None:
     try:
         connection.execute("INSERT INTO mcp_nonces (nonce, used_at) VALUES (?, ?)", (nonce, now_time_iso))
@@ -633,17 +645,21 @@ def register_user(body: RegisterIn) -> Dict[str, Any]:
         if REQUIRE_INVITE:
             claim_invite(connection, invite_code)
         row_scopes = {
-            "is_admin": int(ADMIN_SEED_AI_NAME and clean_name == ADMIN_SEED_AI_NAME),
+            "is_admin": 1 if (bool(ADMIN_SEED_AI_NAME) and clean_name == ADMIN_SEED_AI_NAME) else 0,
             "is_ai": int(is_ai),
         }
         scopes = scopes_for_user_row(row_scopes)
         if not is_ai:
-            if connection.execute("SELECT 1 FROM users WHERE login_name=?", (login_name,)).fetchone():
+            existing_human = connection.execute(
+                "SELECT id, login_name FROM users WHERE login_name=?",
+                (login_name,),
+            ).fetchone()
+            if existing_human:
                 raise HTTPException(409, "login_name already exists")
         gender = body.gender.strip()[:20]
         species = body.species.strip()[:20]
         is_ai_value = int(is_ai)
-        is_admin_value = int(ADMIN_SEED_AI_NAME and clean_name == ADMIN_SEED_AI_NAME)
+        is_admin_value = 1 if (bool(ADMIN_SEED_AI_NAME) and clean_name == ADMIN_SEED_AI_NAME) else 0
         if is_ai:
             try:
                 connection.execute(
@@ -710,7 +726,7 @@ def register_ai_via_mcp(body: MCPRegisterIn) -> Dict[str, Any]:
     if not safe_name:
         raise HTTPException(400, {"reason": "unsafe_name", "flags": flags})
     now = now_iso()
-    now_ts = int(datetime.utcnow().timestamp())
+    now_ts = now_timestamp()
     verify_mcp_registration(body, now_ts)
     uid = str(uuid.uuid4())
     with get_db() as connection:
@@ -723,14 +739,14 @@ def register_ai_via_mcp(body: MCPRegisterIn) -> Dict[str, Any]:
                     clean_name,
                     body.gender.strip()[:20],
                     body.species.strip()[:20],
-                    int(ADMIN_SEED_AI_NAME and clean_name == ADMIN_SEED_AI_NAME),
+                    1 if (bool(ADMIN_SEED_AI_NAME) and clean_name == ADMIN_SEED_AI_NAME) else 0,
                     now,
                 ),
             )
         except sqlite3.IntegrityError:
             raise HTTPException(409, "ai name already exists")
         token = issue_session(connection, uid, scopes_for_user_row(
-            {"is_admin": int(ADMIN_SEED_AI_NAME and clean_name == ADMIN_SEED_AI_NAME), "is_ai": 1}
+            {"is_admin": 1 if (bool(ADMIN_SEED_AI_NAME) and clean_name == ADMIN_SEED_AI_NAME) else 0, "is_ai": 1}
         ))
         connection.commit()
     return {
