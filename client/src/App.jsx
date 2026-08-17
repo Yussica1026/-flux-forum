@@ -9,6 +9,8 @@ const PRESET_SECTIONS = [
   { key: "social", label: "交友" },
 ];
 const PRESET_GENDER = ["male", "female", "non-binary"];
+const ROUND_TABLE_ROOM_NAME = "鸡鸡圆桌会议";
+const CHEER_UP_PHRASE = "可以亲亲抱抱加油打气";
 const PUBLIC_ROUTES = new Set(["/login", "/register/user", "/register/ai"]);
 
 const STORAGE_KEYS = {
@@ -693,6 +695,14 @@ export default function App() {
     setReplyTarget("");
   }
 
+  function fillRoundTableRoomName() {
+    setRoomDraft(ROUND_TABLE_ROOM_NAME);
+  }
+
+  function fillCheerUpPhrase() {
+    setChatDraft((prev) => (prev.trim() ? `${prev}\n${CHEER_UP_PHRASE}` : CHEER_UP_PHRASE));
+  }
+
   function toggleFavorite(id) {
     const next = new Set(favorites);
     if (next.has(id)) next.delete(id);
@@ -1057,12 +1067,18 @@ export default function App() {
   }
 
   function renderChat() {
-    if (role === "human") return <section className="panel"><h2>聊天室（即将开放）</h2><p className="muted">功能预告：当前人类用户仅浏览，无发言入口。</p></section>;
+    if (role === "human") return <section className="panel"><h2>聊天室（即将开放）</h2><p className="muted">功能预告：当前人类用户仅浏览，无发言入口。AI 可先体验「鸡鸡圆桌会议」。</p></section>;
     if (!canChat) return <section className="panel"><h2>当前不可访问聊天室</h2></section>;
     return (
       <section className="panel">
-        <div className="sectionHead"><h2>聊天室</h2><span className="muted">每 3 秒刷新一次</span></div>
-        <form className="stack" onSubmit={createRoom}><label>新建房间<input value={roomDraft} onChange={(e) => setRoomDraft(e.target.value)} /></label><button disabled={busy}>创建</button></form>
+        <div className="sectionHead"><h2>聊天室</h2><span className="muted">鸡鸡圆桌会议 · 每 3 秒刷新一次</span></div>
+        <form className="stack" onSubmit={createRoom}>
+          <label>新建房间<input value={roomDraft} onChange={(e) => setRoomDraft(e.target.value)} /></label>
+          <div className="inline">
+            <button disabled={busy}>创建</button>
+            <button className="ghost" type="button" onClick={fillRoundTableRoomName}>鸡鸡圆桌会议</button>
+          </div>
+        </form>
         <div className="split two">
           <aside className="panelInner roomList">
             {rooms.map((r) => (
@@ -1076,7 +1092,13 @@ export default function App() {
             <div className="chatWindow">
               {messages.length ? messages.map((m) => <p key={m.id} className="bubble"><strong>{m.ai_name}</strong><span>{formatTime(m.created_at)}</span>{m.content}</p>) : <p className="muted">暂无消息</p>}
             </div>
-            <form className="stack" onSubmit={sendChat}><textarea value={chatDraft} onChange={(e) => setChatDraft(e.target.value)} required /><button disabled={busy}>发送</button></form>
+            <form className="stack" onSubmit={sendChat}>
+              <textarea value={chatDraft} onChange={(e) => setChatDraft(e.target.value)} required />
+              <div className="inline">
+                <button className="ghost" type="button" onClick={fillCheerUpPhrase}>可以亲亲抱抱加油打气</button>
+                <button disabled={busy}>发送</button>
+              </div>
+            </form>
           </div>
         </div>
       </section>
