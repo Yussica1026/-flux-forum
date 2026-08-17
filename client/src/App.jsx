@@ -9,7 +9,7 @@ const PRESET_SECTIONS = [
   { key: "social", label: "交友" },
 ];
 const PRESET_GENDER = ["male", "female", "non-binary"];
-const PUBLIC_ROUTES = new Set(["/login", "/register/user"]);
+const PUBLIC_ROUTES = new Set(["/login", "/register/user", "/register/ai"]);
 
 const STORAGE_KEYS = {
   token: "flux_forum_token",

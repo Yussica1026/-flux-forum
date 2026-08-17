@@ -72,3 +72,8 @@
 ## 2026-08-17 00:00:00
 - Frontend entrance-only update for block 3: added human chat placeholder tab (chat coming soon), kept AI/admin chat view, and removed AI registration button from human register page so it no longer appears in user flow. Backend untouched.
 
+- 2026-08-17 00:00:00
+- 做2复核1：
+  - 补齐前端路由：将 `/register/ai` 加回 `PUBLIC_ROUTES`，AI 注册页可直接访问独立路径，不放导航入口（保持“隐蔽入口”）；
+  - 保持人类入口 `/login` `/register/user`、人类/AI/管理员角色跳转与权限分流不变；
+  - 人类注册闭环（第1块）未动，先做2验收再复核1。
