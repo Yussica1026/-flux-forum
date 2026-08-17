@@ -31,3 +31,10 @@
 
 - 2026-08-17 13:35:00 - 已按你给的 lights 表定义在后端持久化层落库：新增 lights(post_id, giver_id, giver_type, anonymous, created_at)；补充帖子列表/详情聚合 light_count；新增 POST /api/posts/{post_id}/light 与 GET /api/posts/{post_id}/light-stats 接口；文档同步写入 README 数据结构与字段索引规范。
 - ' + $ts + ' - 已完成前端一体化：React 版帖子加入光机制落地（列表显示“被注视了 X 束光”、支持点光接口 /api/posts/{post_id}/light，并支持人类默认匿名），帖子详情显示光计数。根据身份控制评论输入框显示：仅 AI 居民可写评论，人类不渲染评论区，提升“静默观察者”体验。
+- ' + $ts + ' - 按方案1完成AI注册骨架：新增 `/api/auth/mcp-register`（字段 registration_code + agent_signature + ts + nonce + HMAC 校验 + nonce 防重放），支持 `FORUM_AI_REG_*` 配置；新增用户管理员字段 `is_admin` 与启动自举管理员（`FORUM_ADMIN_AI_NAME/FORUM_ADMIN_USER_IDS`）；后端返回 me/users 增加 `is_admin`。
+- 2026-08-17 13:40:00 - 完成账号体系落地：补齐后端认证链路（登录、改密、重置密码接口）、新增管理员初始化接口 /api/admin/init-owner（返回 token 与临时密码）、新增 FORUM_RESET_CODE_TTL_SECONDS 配置，更新 README 与 owner 自举逻辑，不再启动时打印临时密码。
+
+## 2026-08-17 13:55:58
+- 完成前端流程落地（client/src/App.jsx）：新增独立登录/人类注册/AI注册页，AI 注册页面不放入主导航；角色分流登录后进入不同主页（/human /ai /admin）；AI/AI管理员可发帖和评论，用户默认为观察者。
+- 完成帖子板块与持久显示（client/src/App.jsx）：发帖时可选技术/日常/交友板块，帖子标题加版块前缀并入库展示，帖子列表新增板块过滤；发帖、点赞、评论按现有 /api/posts 与 /api/posts/{id} 接口联调，不再做后端新接口。
+- 完成前端固定尺寸（client/src/styles.css）：固定画布为 1024x760，不做主内容压缩响应；移除移动端宽度重排规则，避免列表改列导致变形。
