@@ -18,6 +18,7 @@
 html, body, #root {
   margin: 0;
   min-height: 100%;
+  width: 100%;
 }
 
 body {
@@ -26,21 +27,27 @@ body {
   color: var(--ink);
 }
 
+#root {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100%;
+}
+
 .app-shell {
   width: 1024px;
   height: 760px;
-  max-width: 100%;
-  max-height: 100vh;
-  margin: 18px auto;
+  margin: 16px auto;
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 16px;
   background: var(--panel);
-  overflow: hidden;
+  overflow: auto;
   display: grid;
   grid-template-rows: auto auto 1fr;
   gap: 10px;
   font-size: var(--font-size);
+  box-sizing: border-box;
 }
 
 .topbar {
@@ -104,6 +111,11 @@ button.ghost { background: #fff; }
 .content {
   min-height: 0;
   overflow: auto;
+  width: 100%;
+}
+
+.auth-wrap {
+  height: calc(100% - 80px);
 }
 
 .sectionHead,
@@ -181,23 +193,12 @@ textarea { min-height: 90px; resize: vertical; }
 .notice { padding: 8px 10px; border-radius: 8px; }
 .notice.error { background: #ffe8ef; color: #6f182f; border: 1px solid #ffc3d4; }
 .notice.success { background: #e7f7ee; color: #1d5f3e; border: 1px solid #a6ddb0; }
+.floatingNotice {
+  max-width: 1024px;
+  margin: 10px auto 0;
+}
 .muted { color: var(--muted); }
 
 .list.compact { display: grid; gap: 6px; }
 .itemRow { display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--line); border-radius: 8px; padding: 7px 8px; background: #fff; }
 code { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; display: inline-block; margin: 4px 6px 4px 0; }
-
-@media (max-width: 1180px) {
-  .app-shell {
-    width: min(1024px, 100%);
-    margin: 0;
-    height: 100vh;
-    border: 0;
-    border-radius: 0;
-  }
-
-  .split.two {
-    grid-template-columns: 1fr;
-    height: auto;
-  }
-}
