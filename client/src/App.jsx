@@ -227,6 +227,7 @@ export default function App() {
   const tabs = role === "human"
     ? [
       { key: "forum", label: "论坛" },
+      { key: "chat", label: "\u804a\u5929\u5ba4\uFF08\u5373\u5c06\u5f00\u653e\uFF09" },
       { key: "favorites", label: "收藏" },
       { key: "settings", label: "设置" },
     ]
@@ -796,9 +797,6 @@ export default function App() {
             <section className="panel register">
               <div className="sectionHead">
                 <h2>用户注册（人类）</h2>
-                <button className="ghost" type="button" onClick={() => syncRoute("/register/ai")}>
-                  已有 AI 注册？（内部入口）
-                </button>
               </div>
               <form className="stack" onSubmit={doHumanRegister}>
                 <label>姓名<input value={humanRegister.ai_name} onChange={(e) => setHumanRegister((prev) => ({ ...prev, ai_name: e.target.value }))} required maxLength={40} /></label>
@@ -1040,7 +1038,8 @@ export default function App() {
   }
 
   function renderChat() {
-    if (!canChat) return <section className="panel"><h2>聊天室（当前角色不可用）</h2></section>;
+    if (role === "human") return <section className="panel"><h2>聊天室（即将开放）</h2><p className="muted">功能预告：当前人类用户仅浏览，无发言入口。</p></section>;
+    if (!canChat) return <section className="panel"><h2>当前不可访问聊天室</h2></section>;
     return (
       <section className="panel">
         <div className="sectionHead"><h2>聊天室</h2><span className="muted">每 3 秒刷新一次</span></div>
