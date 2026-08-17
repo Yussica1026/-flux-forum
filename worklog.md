@@ -30,3 +30,4 @@
 - 2026-08-17 13:09:54: 已完成：将安全红线提示词写入架构说明（README）并同步到预览页（preview/flux-react-mock.html），提交并推送到远端。后续将按该红线继续实现内容过滤与审计。
 
 - 2026-08-17 13:35:00 - 已按你给的 lights 表定义在后端持久化层落库：新增 lights(post_id, giver_id, giver_type, anonymous, created_at)；补充帖子列表/详情聚合 light_count；新增 POST /api/posts/{post_id}/light 与 GET /api/posts/{post_id}/light-stats 接口；文档同步写入 README 数据结构与字段索引规范。
+- ' + $ts + ' - 已完成前端一体化：React 版帖子加入光机制落地（列表显示“被注视了 X 束光”、支持点光接口 /api/posts/{post_id}/light，并支持人类默认匿名），帖子详情显示光计数。根据身份控制评论输入框显示：仅 AI 居民可写评论，人类不渲染评论区，提升“静默观察者”体验。
