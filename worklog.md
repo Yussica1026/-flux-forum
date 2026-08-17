@@ -56,3 +56,15 @@
 - å·²æ›´æ–°å‰ç«¯äººç±»æ³¨å†Œé¡µï¼š`/register/user` å¢åŠ  `è´¦å·` ä¸ `å¯†ç ` è¾“å…¥å­—æ®µï¼Œæäº¤æ—¶å¸¦ `is_ai: false / login_name / password`ï¼Œå®ŒæˆåæŒ‰è§’è‰²ç›´è·³ç”¨æˆ·é¦–é¡µã€‚
 - å·²ä¿ç•™è§’è‰²è·¯ç”±éš”ç¦»ï¼šç”¨æˆ·é»˜è®¤è¿›å…¥ `/human`ï¼ŒAI/ç®¡ç†å‘˜è¿›å…¥ `/ai` æˆ– `/admin`ï¼›åç»­å¯ç›´æ¥è”é€šå‘å¸ƒæµç¨‹åšâ€œæ³¨å†Œå³ç™»å½•â€é—­ç¯éªŒè¯ã€‚
 - [checkpoint] 2026-08-17: AI registration via /api/auth/mcp-register and post persistence via /api/posts are wired and verified in app flow. Human register /api/auth/register also returns login token and routes by role. Need next run: end-to-end test using local backend+frontend.
+## 2026-08-17 23:58:00
+- Íê³ÉµÚ2¿éÑéÊÕ×¼±¸£¨AI ×¢²á±Õ»·Ç°ÖÃ£©£º
+  - ºó¶Ë `/api/auth/mcp-register` Ç©ÃûÁ´Â·ĞŞ¸´£º
+    - `FORUM_AI_REG_HMAC_SECRET` Í³Ò» `.strip()`£¬Ïû³ıÎ²Ëæ¿Õ¸ñµ¼ÖÂµÄÇ©Ãû²»Ò»ÖÂ¡£
+    - `agent_signature` Ğ£ÑéÊ¹ÓÃ `ai_name/gender/species` ¹éÒ»»¯£¨`strip()`£©ºóµÄ×Ö¶ÎÆ´½Ó£¬±ÜÃâÇ°ºó¿Õ°×µ¼ÖÂÇ©Ãû´íÅä¡£
+    - ¹Ø±Õ `mcp-register` µÄÏêÏ¸ mismatch »ØÏÔ£¬Í³Ò»·µ»Ø `agent_signature mismatch`£¬±ÜÃâĞ¹Â¶Ç©ÃûÔ­ÎÄ¡£
+    - ÒÆ³ıÆô¶¯ÆÚ´òÓ¡ AI ×¢²áÃÜÔ¿ºÍ TTL µÄµ÷ÊÔÊä³ö¡£
+  - AI ×¢²áÇ©ÃûÀ´Ô´Ã÷È·Ğ´Èë README£º½öÀ´×Ô MCP ÅäÖÃ secret£¬²»ÊÇÇ°¶ËÊÖÊä¡£
+- Íê³ÉµÚ1¿éÂ·ÓÉ¼Ó¹Ì£¨µÚÒ»²ã£©£º
+  - Ç°¶Ë `PUBLIC_ROUTES` ÖĞÒÆ³ı `/register/ai`£¬AI ×¢²áÈë¿Ú²»ÔÙ×÷ÎªÆÕÍ¨¹«¿ªÂ·ÓÉ¡£
+  - ÈËÀàÈë¿Ú `/login` `/register/user` ±£Áô£¬ÆäËûÂ·¾¶¼ÌĞø×ßÒÑÓĞ½ÇÉ«Â·ÓÉ¶µµ×¡£
+- Î´Íê³É£ºÎ´½øÈëµÚ3¿é£¨ÁÄÌìÊÒ/¹ÜÀíÈë¿Ú£©¡£ÏÂÒ»²½ĞèÈ·ÈÏÄã¾ö¶¨µÄÂ·ÓÉ¿É¼û±ß½çºóÔÙ½Ó¡£

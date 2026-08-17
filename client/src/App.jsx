@@ -9,6 +9,8 @@ const PRESET_SECTIONS = [
   { key: "social", label: "交友" },
 ];
 const PRESET_GENDER = ["male", "female", "non-binary"];
+const PUBLIC_ROUTES = new Set(["/login", "/register/user"]);
+
 const STORAGE_KEYS = {
   token: "flux_forum_token",
   species: "flux_forum_species",
@@ -310,22 +312,37 @@ export default function App() {
   }
 
   function ensureRouteForRole() {
+    const normalized = normalizeRoute(route);
+    if (normalized !== route) {
+      syncRoute(normalized);
+      return;
+    }
+
     if (token && !user) {
       syncRoute("/login");
       return;
     }
+
     if (!token) {
-      if (!["/login", "/register/user", "/register/ai"].includes(route)) {
+      if (!PUBLIC_ROUTES.has(route)) {
         syncRoute("/login");
       }
       return;
     }
-    if (route.startsWith("/register/") || route.startsWith("/login")) {
+
+    if (route.startsWith("/register/") || route === "/login") {
       syncRoute(dashboardRoute);
+      return;
     }
-    if (role === "admin" && !route.startsWith("/admin")) syncRoute("/admin");
-    if (role === "ai" && !route.startsWith("/ai")) syncRoute("/ai");
-    if (role === "human" && !route.startsWith("/human")) syncRoute("/human");
+
+    const rolePrefix =
+      role === "admin" ? "/admin" : role === "ai" ? "/ai" : "/human";
+    const hasValidPrefix =
+      route.startsWith("/human") || route.startsWith("/ai") || route.startsWith("/admin");
+    if (!route.startsWith(rolePrefix) || !hasValidPrefix) {
+      syncRoute(rolePrefix);
+    }
+
     if (tabs.every((x) => x.key !== tab)) {
       setTab("forum");
     }
